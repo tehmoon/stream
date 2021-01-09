@@ -4,6 +4,7 @@ import (
 	"sync"
 	"time"
 	"log"
+	"runtime"
 )
 
 /*
@@ -55,8 +56,10 @@ func main() {
 			case <- after:
 				log.Println("Calling close c1")
 				close(c1)
-				<- c4
-				log.Println("Feedback received")
+				for stream := range c4 {
+					log.Printf("Feedback received for stream %s\n", stream.Id())
+					Drain(stream.C(), nil)
+				}
 				break LOOP
 			case stream, opened := <- c4:
 				if ! opened {
@@ -69,5 +72,11 @@ func main() {
 	}
 
 	log.Println("Waiting for work to finish")
+	go func() {
+		time.Sleep(100000*time.Second)
+	}()
 	wg.Wait()
+	stacktrace := make([]byte, 8192)
+	length := runtime.Stack(stacktrace, true)
+  log.Println(string(stacktrace[:length]))
 }

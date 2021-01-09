@@ -13,7 +13,7 @@ type Stream struct {
 
 func NewStream(metadata map[string]string) (*Stream) {
 	id := make([]byte, 6)
-	//TODO fix
+	//TODO handle error
 	rand.Read(id)
 	return &Stream{
 		c: make(chan []byte, 0),

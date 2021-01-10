@@ -2,8 +2,7 @@ package main
 
 import (
 	"sync"
-	"log"
-	"runtime"
+	"context"
 )
 
 /*
@@ -36,31 +35,51 @@ import (
 		[4]["stream.remote-ip"] = "127.0.0.1"
 */
 
-var modules = []Module{NewModule1("127.0.0.1:12345"), NewTCPServer("127.0.0.1:12346"),}
+func start(modules []Module, ctx context.Context, wg *sync.WaitGroup) {
+	defer wg.Done()
 
-func main() {
-	wg := &sync.WaitGroup{}
-	c1 := make(chan *Stream, 0)
-	c2 := make(chan *Stream, 0)
-	c3 := make(chan *Stream, 0)
-	wg.Add(2)
-	modules[0].Start(c1, c2, wg)
-	modules[1].Start(c2, c3, wg)
+	if len(modules) == 0 {
+		return
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	chans := []chan *Stream{make(chan *Stream, 0),}
+	for i, m := range modules {
+		wg.Add(1)
+		chans = append(chans, make(chan *Stream, 0))
+		m.Start(chans[i], chans[i+1], ctx, wg)
+	}
 
 	LOOP: for {
 		select {
-			case stream, opened := <- c3:
+			case <- ctx.Done():
+				close(chans[0])
+				wg.Add(1)
+				go Drain(chans[len(chans)-1], wg)
+				break LOOP
+			case stream, opened := <- chans[len(chans)-1]:
 				if ! opened {
-					close(c1)
+					close(chans[0])
 					break LOOP
 				}
 
-				c1 <- stream
+				chans[0] <- stream
 		}
 	}
+}
 
+func main() {
+	modules := []Module{NewModule1("127.0.0.1:12345"), NewTCPServer("127.0.0.1:12346"),}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go start(modules, ctx, wg)
 	wg.Wait()
-	stacktrace := make([]byte, 8192)
-	length := runtime.Stack(stacktrace, true)
-  log.Println(string(stacktrace[:length]))
+
+	PrintAllStacks()
 }

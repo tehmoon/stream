@@ -9,17 +9,17 @@ import (
 )
 
 type Module interface {
-	Start(in, out chan *Stream, wg *sync.WaitGroup) error
+	Start(in, out chan *Stream, ctx context.Context, wg *sync.WaitGroup) error
 }
 
 type Module1 struct {
 	Addr string
 }
 
-func (m Module1) Start(in, out chan *Stream, wg *sync.WaitGroup) (error) {
+func (m Module1) Start(in, out chan *Stream, ctx context.Context, wg *sync.WaitGroup) (error) {
 
 	relayer := NewRelayer()
-	ctx, moduleCancel := context.WithCancel(context.Background())
+	ctx, moduleCancel := context.WithCancel(ctx)
 	sig := make(chan interface{}, 0)
 
 	conns := make(chan *net.TCPConn, 0)

@@ -6,6 +6,7 @@ import (
 	"log"
 	"context"
 	"time"
+	"runtime"
 )
 
 /*
@@ -22,6 +23,10 @@ func Drain(v interface{}, wg *sync.WaitGroup) {
 			for range c {}
 		case chan interface{}:
 			for range c {}
+		case chan *Stream:
+			for s := range c {
+				Drain(s, nil)
+			}
 		default:
 			panic(fmt.Sprintf("Type %T is not valid to drain\n", c))
 	}
@@ -198,3 +203,9 @@ func MainLoop(in, out chan *Stream, relayer chan *Relayer, sig chan interface{},
 }
 
 type Handler func(relay *Relayer, wg *sync.WaitGroup, ctx context.Context, cancel context.CancelFunc)
+
+func PrintAllStacks() {
+	stacktrace := make([]byte, 8192)
+	length := runtime.Stack(stacktrace, true)
+  log.Println(string(stacktrace[:length]))
+}

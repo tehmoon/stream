@@ -12,7 +12,7 @@ type TCPServer struct {
 	Addr string
 }
 
-func (m TCPServer) Start(in, out chan *Stream, wg *sync.WaitGroup) (error) {
+func (m TCPServer) Start(in, out chan *Stream, ctx context.Context, wg *sync.WaitGroup) (error) {
 	relayer := NewRelayer()
 	ctx, moduleCancel := context.WithCancel(context.Background())
 	sig := make(chan interface{}, 0)

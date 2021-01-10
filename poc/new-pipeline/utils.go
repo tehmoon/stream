@@ -34,9 +34,13 @@ func Drain(v interface{}, wg *sync.WaitGroup) {
 func MainLoop(in, out chan *Stream, relayer chan *Relayer, sig chan interface{}, timeout time.Duration, handlerIn Handler, handlerOut Handler, ctx context.Context, wg *sync.WaitGroup) {
 	relaySig := make(chan interface{}, 0)
 
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		defer close(relaySig)
-		defer Drain(sig, nil)
+
+		wg.Add(1)
+		defer Drain(sig, wg)
 
 		log.Println("Starting incoming conn loop")
 		LOOP: for {
@@ -64,13 +68,19 @@ func MainLoop(in, out chan *Stream, relayer chan *Relayer, sig chan interface{},
 						break LOOP
 					}
 
-					log.Printf("Starting work for stream in %s, out %s\n")
+					log.Printf("Starting work for stream in %s, out %s\n", relay.In.Id(), relay.Out.Id())
 
 					// Wraps context
 					ctx, cancel := context.WithCancel(ctx)
-					wg.Add(2)
-					go handlerIn(relay, wg, ctx, cancel)
-					go handlerOut(relay, wg, ctx, cancel)
+					if handlerIn != nil {
+						wg.Add(1)
+						go handlerIn(relay, wg, ctx, cancel)
+					}
+
+					if handlerOut != nil {
+						wg.Add(1)
+						go handlerOut(relay, wg, ctx, cancel)
+					}
 			}
 		}
 	}()
@@ -80,6 +90,7 @@ func MainLoop(in, out chan *Stream, relayer chan *Relayer, sig chan interface{},
 	vs := make([]interface{}, 0)
 
 	if timeout <= 0 {
+		log.Println("Negative timeout, set to max limit")
 		timeout = (1<<63) - 1 // will tick in ~294 years
 	}
 
@@ -87,15 +98,20 @@ func MainLoop(in, out chan *Stream, relayer chan *Relayer, sig chan interface{},
 	defer ticker.Stop()
 
 	if timeout <= 0 {
+		log.Println("Stoping timeout negative")
 		ticker.Stop()
 	}
 
+	log.Printf("Timeout set to %v %v\n", timeout, ticker)
 	LOOP: for {
 		select {
 			case <- ctx.Done():
-				go Drain(relaySig, nil)
+				log.Println("123blih")
+				wg.Add(1)
+				go Drain(relaySig, wg)
 				break LOOP
 			case v, opened := <- relaySig:
+				log.Println("124blih")
 				ticker.Stop()
 				if ! opened {
 					break LOOP
@@ -133,10 +149,11 @@ func MainLoop(in, out chan *Stream, relayer chan *Relayer, sig chan interface{},
 						log.Println("Relay sent")
 				}
 			case inStream, opened := <- in:
-				ticker.Stop()
+				log.Println("received stream")
 				if ! opened {
 					log.Println("inStream closed")
-					go Drain(relaySig, nil)
+					wg.Add(1)
+					go Drain(relaySig, wg)
 					break LOOP
 				}
 
@@ -169,12 +186,13 @@ func MainLoop(in, out chan *Stream, relayer chan *Relayer, sig chan interface{},
 	}
 
 	for _, stream := range ins {
-		log.Printf("Draining stream %s after main loop\n", stream.Id())
-		Drain(stream.C(), nil)
+		log.Printf("Draining stream in %s after main loop\n", stream.Id())
+		wg.Add(1)
+		go Drain(stream.C(), wg)
 	}
 
 	for _, stream := range outs {
-		log.Printf("Closing stream %s after main loop\n", stream.Id())
+		log.Printf("Closing stream out %s after main loop\n", stream.Id())
 		close(stream.C())
 	}
 }

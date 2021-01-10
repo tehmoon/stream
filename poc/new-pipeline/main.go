@@ -2,7 +2,6 @@ package main
 
 import (
 	"sync"
-	"time"
 	"log"
 	"runtime"
 )
@@ -37,31 +36,20 @@ import (
 		[4]["stream.remote-ip"] = "127.0.0.1"
 */
 
-var modules = []Module{NewModule1(), NewModule1(), NewModule1(),}
+var modules = []Module{NewModule1("127.0.0.1:12345"), NewTCPServer("127.0.0.1:12346"),}
 
 func main() {
 	wg := &sync.WaitGroup{}
 	c1 := make(chan *Stream, 0)
 	c2 := make(chan *Stream, 0)
 	c3 := make(chan *Stream, 0)
-	c4 := make(chan *Stream, 0)
-	wg.Add(3)
+	wg.Add(2)
 	modules[0].Start(c1, c2, wg)
 	modules[1].Start(c2, c3, wg)
-	modules[2].Start(c3, c4, wg)
 
-	after := time.After(25 * time.Second)
 	LOOP: for {
 		select {
-			case <- after:
-				log.Println("Calling close c1")
-				close(c1)
-				for stream := range c4 {
-					log.Printf("Feedback received for stream %s\n", stream.Id())
-					Drain(stream.C(), nil)
-				}
-				break LOOP
-			case stream, opened := <- c4:
+			case stream, opened := <- c3:
 				if ! opened {
 					close(c1)
 					break LOOP
@@ -71,10 +59,6 @@ func main() {
 		}
 	}
 
-	log.Println("Waiting for work to finish")
-	go func() {
-		time.Sleep(100000*time.Second)
-	}()
 	wg.Wait()
 	stacktrace := make([]byte, 8192)
 	length := runtime.Stack(stacktrace, true)

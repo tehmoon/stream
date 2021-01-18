@@ -11,6 +11,7 @@ type TestModuleConfig struct {
 	NewConnEvery time.Duration
 	NewConnMax int64
 	DelayInPayload time.Duration
+	NewConnFunc func()
 }
 
 type TestModule struct {
@@ -64,6 +65,10 @@ func (m TestModule) Start(in, out chan *Stream, ctx context.Context, wg *sync.Wa
 					break LOOP
 				case <- ticker.C:
 					log.Println("ticker received in loop")
+					if f := m.config.NewConnFunc; f != nil {
+						f()
+					}
+
 					select {
 						case <- ctx.Done():
 							log.Println("cancelling ctx in inner loop")
@@ -75,6 +80,7 @@ func (m TestModule) Start(in, out chan *Stream, ctx context.Context, wg *sync.Wa
 		}
 	}()
 
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		defer moduleCancel()

@@ -101,6 +101,7 @@ func (m Module1) Start(in, out chan *Stream, ctx context.Context, wg *sync.WaitG
 		log.Printf("Sending done, closing stream %s\n", relay.Out.Id())
 	}
 
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		defer close(out)

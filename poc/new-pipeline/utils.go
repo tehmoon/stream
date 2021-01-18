@@ -44,8 +44,7 @@ func MainLoop(in, out chan *Stream, relayer chan *Relayer, sig chan interface{},
 		defer wg.Done()
 		defer close(relaySig)
 
-		wg.Add(1)
-		defer Drain(sig, wg)
+		defer Drain(sig, nil)
 
 		log.Println("Starting incoming conn loop")
 		LOOP: for {

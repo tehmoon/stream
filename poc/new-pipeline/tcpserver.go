@@ -73,7 +73,11 @@ func (m TCPServer) Start(in, out chan *Stream, ctx context.Context, wg *sync.Wai
 
 	// Handle err
 	addr, _ := net.ResolveTCPAddr("tcp", m.Addr)
-	listener, _ := net.ListenTCP("tcp", addr)
+	listener, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		log.Printf("Error listening tcp: %s\n", err.Error())
+	}
+	log.Println("Server is listening")
 
 	wg.Add(1)
 	go func() {
@@ -98,6 +102,7 @@ func (m TCPServer) Start(in, out chan *Stream, ctx context.Context, wg *sync.Wai
 	}()
 
 	// Main loop
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		defer close(out)

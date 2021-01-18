@@ -36,7 +36,14 @@ import (
 */
 
 func start(modules []Module, ctx context.Context, wg *sync.WaitGroup) {
-	defer wg.Done()
+	if wg != nil {
+		defer wg.Done()
+	}
+
+	if wg == nil {
+		wg = &sync.WaitGroup{}
+		defer wg.Wait()
+	}
 
 	if len(modules) == 0 {
 		return
@@ -47,7 +54,6 @@ func start(modules []Module, ctx context.Context, wg *sync.WaitGroup) {
 
 	chans := []chan *Stream{make(chan *Stream, 0),}
 	for i, m := range modules {
-		wg.Add(1)
 		chans = append(chans, make(chan *Stream, 0))
 		m.Start(chans[i], chans[i+1], ctx, wg)
 	}
@@ -56,7 +62,9 @@ func start(modules []Module, ctx context.Context, wg *sync.WaitGroup) {
 		select {
 			case <- ctx.Done():
 				close(chans[0])
-				wg.Add(1)
+				if wg != nil {
+					wg.Add(1)
+				}
 				go Drain(chans[len(chans)-1], wg)
 				break LOOP
 			case stream, opened := <- chans[len(chans)-1]:
